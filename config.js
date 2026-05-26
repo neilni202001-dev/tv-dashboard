@@ -79,7 +79,7 @@ const TV_CONFIG = {
      * 填好下面两项，图片上传到仓库即可，无需手动配置URL
      */
     github: {
-      owner: '你的GitHub用户名',     // GitHub 用户名
+      owner: 'neilni202001-dev',     // GitHub 用户名
       repo: 'tv-dashboard',          // 仓库名
       path: 'image',                // 图片文件夹名
     },
