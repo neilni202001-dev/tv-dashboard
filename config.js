@@ -79,9 +79,21 @@ const TV_CONFIG = {
      * 填好下面两项，图片上传到仓库即可，无需手动配置URL
      */
     github: {
-      owner: 'neilni202001-dev',     // GitHub 用户名
+      owner: '你的GitHub用户名',     // GitHub 用户名
       repo: 'tv-dashboard',          // 仓库名
-      path: 'image',                // 图片文件夹名
+      path: 'images',                // 图片文件夹名
+      branch: 'main',                // 分支名（默认 main，不用改）
+      /**
+       * API 令牌（选填）
+       * 不填也能用，但每小时只能请求60次，可能被限流
+       * 填了可以提升到5000次/小时，一劳永逸
+       *
+       * 创建方式:
+       *   GitHub → Settings → Developer settings →
+       *   Personal access tokens → Tokens (classic) →
+       *   Generate new token → 勾选 public_repo → 生成
+       */
+      token: '',
     },
 
     /**
