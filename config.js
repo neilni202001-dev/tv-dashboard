@@ -81,7 +81,7 @@ const TV_CONFIG = {
     github: {
       owner: '你的GitHub用户名',     // GitHub 用户名
       repo: 'tv-dashboard',          // 仓库名
-      path: 'images',                // 图片文件夹名
+      path: 'image',                // 图片文件夹名
     },
 
     /**
