@@ -708,7 +708,15 @@ class TVDashboard {
       + encodeURIComponent(github.repo) + '/contents/'
       + encodeURIComponent(github.path);
 
-    fetch(apiUrl)
+    var branch = github.branch || 'main';
+
+    // 如果有 token 就带上，提高 API 频率限制（从60次/时提升到5000次/时）
+    var fetchOpts = { headers: {} };
+    if (github.token && github.token.length > 0) {
+      fetchOpts.headers['Authorization'] = 'Bearer ' + github.token;
+    }
+
+    fetch(apiUrl, fetchOpts)
       .then(function(r) {
         if (!r.ok) throw new Error('API响应 ' + r.status);
         return r.json();
@@ -718,19 +726,22 @@ class TVDashboard {
         for (var i = 0; i < files.length; i++) {
           var f = files[i];
           if (f.type === 'file' && f.name.match(/\.(png|jpg|jpeg|gif|webp)$/i)) {
-            urls.push(f.download_url);
+            // 使用 jsdelivr CDN（国内访问快），不用 raw.githubusercontent.com
+            urls.push('https://cdn.jsdelivr.net/gh/'
+              + encodeURIComponent(github.owner) + '/'
+              + encodeURIComponent(github.repo) + '@' + branch + '/'
+              + encodeURIComponent(github.path) + '/'
+              + encodeURIComponent(f.name));
           }
         }
         if (urls.length === 0) throw new Error('图片文件夹中没有图片文件');
         self.imageUrls = urls;
         self.showEmptyState(false);
         self.showImage(0);
-        // 如果当前正在显示图片页，立即启动自动播放
         if (self.currentSlide === 1) self.startImageAdvance();
       })
       .catch(function(err) {
-        console.warn('GitHub 图片读取失败，尝试手动列表:', err.message);
-        // 回退到手动URL列表
+        console.warn('GitHub 图片加载失败，尝试手动列表:', err.message);
         var urls = (TV_CONFIG.images && TV_CONFIG.images.urls) || [];
         if (urls.length > 0) {
           self.imageUrls = urls;
