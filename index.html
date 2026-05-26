@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920">
+<title>电视看板</title>
+<style>
+  /* ========== 基础重置 ========== */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-primary: #080c18;
+    --bg-secondary: #0f172a;
+    --bg-card: #1a2332;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --success: #22c55e;
+    --warning: #eab308;
+    --danger: #ef4444;
+    --border: rgba(148, 163, 184, 0.12);
+    --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    --radius: 12px;
+    --transition: 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  /* ========== 轮播容器 ========== */
+  .carousel {
+    display: flex;
+    width: 100%; height: 100vh;
+    transition: transform var(--transition);
+    will-change: transform;
+  }
+
+  .slide {
+    min-width: 100%; height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ========== 页面1: PPT嵌入 ========== */
+  #slide-ppt iframe {
+    width: 100%; height: 100%;
+    border: none;
+    background: #fff;
+  }
+
+  .iframe-fallback {
+    display: none;
+    position: absolute;
+    inset: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-size: 28px;
+    gap: 20px;
+  }
+  .iframe-fallback.visible { display: flex; }
+
+  /* ========== 页面2: 数据看板 ========== */
+  #slide-data {
+    display: flex;
+    flex-direction: column;
+    padding: 48px 64px 32px;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 50%, rgba(59, 130, 246, 0.04) 0%, transparent 60%),
+      var(--bg-primary);
+  }
+
+  .data-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .data-header h1 {
+    font-size: 40px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--text-primary), var(--accent-hover));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .data-header-info {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    font-size: 18px;
+    color: var(--text-secondary);
+  }
+
+  .data-header-info .status-dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--success);
+    margin-right: 6px;
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  .data-header-info .status-dot.error { background: var(--danger); animation: none; }
+  .data-header-info .status-dot.loading { background: var(--warning); animation: pulse-dot 1s ease-in-out infinite; }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* 表格容器 */
+  .table-container {
+    flex: 1;
+    margin-top: 24px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .table-scroll {
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
+  }
+  .table-scroll::-webkit-scrollbar { width: 6px; }
+  .table-scroll::-webkit-scrollbar-track { background: transparent; }
+  .table-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.2); border-radius: 3px; }
+
+  /* TV优化表格 */
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 26px;
+  }
+
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  thead th {
+    background: var(--accent);
+    color: #fff;
+    padding: 18px 24px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 24px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  thead th:first-child { border-radius: var(--radius) 0 0 0; }
+  thead th:last-child { border-radius: 0 var(--radius) 0 0; }
+
+  tbody tr {
+    transition: background 0.2s;
+  }
+  tbody tr:hover {
+    background: rgba(59, 130, 246, 0.08);
+  }
+  tbody tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  tbody td {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    line-height: 1.5;
+    vertical-align: middle;
+  }
+
+  /* 状态标签 */
+  .badge {
+    display: inline-block;
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-size: 20px;
+    font-weight: 500;
+  }
+  .badge-success { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+  .badge-warning { background: rgba(234, 179, 8, 0.15); color: var(--warning); }
+  .badge-danger  { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+  .badge-info    { background: rgba(59, 130, 246, 0.15); color: var(--accent-hover); }
+
+  /* 空状态 / 加载 / 错误 */
+  .table-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 60%;
+    color: var(--text-secondary);
+    font-size: 28px;
+    gap: 16px;
+  }
+  .table-state.visible { display: flex; }
+  .table-state .icon { font-size: 64px; opacity: 0.4; }
+  .table-state .retry-btn {
+    margin-top: 12px;
+    padding: 12px 32px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 22px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .table-state .retry-btn:hover { background: var(--accent-hover); }
+  .table-state .error-detail {
+    font-size: 18px;
+    color: var(--danger);
+    margin-top: 8px;
+  }
+
+  /* 页脚更新时间 */
+  .data-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 18px;
+    color: var(--text-secondary);
+    margin-top: 16px;
+  }
+  .data-footer .count {
+    color: var(--accent-hover);
+    font-weight: 600;
+  }
+
+  /* ========== 导航控件 ========== */
+  .nav-dots {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 14px;
+    z-index: 100;
+    padding: 10px 20px;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+    border-radius: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .nav-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+  .nav-dot:hover { background: rgba(255, 255, 255, 0.5); }
+  .nav-dot.active {
+    background: var(--accent);
+    box-shadow: 0 0 20px var(--accent);
+    width: 32px;
+    border-radius: 6px;
+  }
+
+  /* 页面指示器 */
+  .page-indicator {
+    position: fixed;
+    top: 24px;
+    right: 32px;
+    z-index: 100;
+    font-size: 16px;
+    color: var(--text-secondary);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 暂停提示 */
+  .pause-overlay {
+    display: none;
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    padding: 10px 24px;
+    border-radius: 20px;
+    font-size: 18px;
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .pause-overlay.visible { display: block; }
+  .pause-overlay .key {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 15px;
+    margin: 0 4px;
+  }
+
+  /* ========== 页面切换提示 ========== */
+  .slide-label {
+    position: absolute;
+    left: 32px;
+    bottom: 90px;
+    font-size: 16px;
+    color: var(--text-secondary);
+    opacity: 0.6;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 6px 14px;
+    border-radius: 16px;
+    backdrop-filter: blur(8px);
+  }
+
+  /* ========== 页面3: 图片轮播 ========== */
+  #slide-images {
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #slide-images .img-wrap {
+    width: 100%; height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: #000;
+  }
+
+  #slide-images .img-wrap img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.8s ease;
+    will-change: opacity;
+  }
+  #slide-images .img-wrap img.active {
+    opacity: 1;
+  }
+
+  #slide-images .img-empty {
+    color: var(--text-secondary);
+    font-size: 28px;
+    text-align: center;
+    line-height: 2;
+  }
+  #slide-images .img-empty .icon { font-size: 64px; opacity: 0.4; display: block; }
+
+  #slide-images .img-counter {
+    position: absolute;
+    bottom: 100px;
+    right: 40px;
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.6);
+    background: rgba(0, 0, 0, 0.5);
+    padding: 6px 18px;
+    border-radius: 16px;
+    backdrop-filter: blur(4px);
+    font-variant-numeric: tabular-nums;
+  }
+
+  #slide-images .img-progress-bar {
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 4px;
+    background: var(--accent);
+    border-radius: 0 2px 0 0;
+    transition: width 0.3s linear;
+    z-index: 10;
+  }
+
+  /* ========== 动画 ========== */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .slide.active .table-scroll {
+    animation: fadeIn 0.6s ease-out;
+  }
+</style>
+</head>
+<body>
+
+  <!-- ===== 轮播容器 ===== -->
+  <div class="carousel" id="carousel">
+
+    <!-- === 页面1: PPT === -->
+    <div class="slide" id="slide-ppt">
+      <iframe
+        id="ppt-frame"
+        src="about:blank"
+        allow="fullscreen"
+        loading="lazy"
+        title="PPT看板">
+      </iframe>
+      <div class="iframe-fallback" id="ppt-fallback">
+        <div class="icon">📄</div>
+        <div>PPT加载失败，请检查网络或链接地址</div>
+      </div>
+      <div class="slide-label">PPT · 腾讯文档</div>
+    </div>
+
+    <!-- === 页面2: PPT图片轮播（自动滚动） === -->
+    <div class="slide" id="slide-images">
+      <div class="img-wrap" id="img-wrap">
+        <div class="img-empty" id="img-empty">
+          <span class="icon">🖼️</span>
+          请在 config.js → images 中配置图片链接
+        </div>
+        <img id="img-main" class="active" style="display:none" alt="轮播图片" />
+        <div class="img-counter" id="img-counter">0 / 0</div>
+        <div class="img-progress-bar" id="img-progress-bar"></div>
+      </div>
+      <div class="slide-label">图片轮播 · PPT</div>
+    </div>
+
+    <!-- === 页面3: 数据看板 === -->
+    <div class="slide" id="slide-data">
+      <div class="data-header">
+        <h1>数据看板</h1>
+        <div class="data-header-info">
+          <span>
+            <span class="status-dot" id="status-dot"></span>
+            <span id="status-text">等待加载</span>
+          </span>
+          <span id="clock">--:--:--</span>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <!-- 加载状态 -->
+        <div class="table-state visible" id="state-loading">
+          <div class="icon">⏳</div>
+          <div>正在加载数据...</div>
+        </div>
+        <!-- 错误状态 -->
+        <div class="table-state" id="state-error">
+          <div class="icon">⚠️</div>
+          <div>数据加载失败</div>
+          <div class="error-detail" id="error-detail"></div>
+          <button class="retry-btn" onclick="app.fetchData()">重新加载</button>
+        </div>
+        <!-- 空数据状态 -->
+        <div class="table-state" id="state-empty">
+          <div class="icon">📭</div>
+          <div>暂无数据</div>
+        </div>
+        <!-- 表格 -->
+        <div class="table-scroll" id="table-scroll" style="display:none;">
+          <table>
+            <thead id="table-head"></thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="data-footer">
+        <span>最后更新: <span id="update-time">--</span></span>
+        <span>共 <span class="count" id="row-count">0</span> 条记录</span>
+      </div>
+      <div class="slide-label">数据看板 · 腾讯文档</div>
+    </div>
+  </div>
+
+  <!-- ===== 导航控件 ===== -->
+  <div class="page-indicator" id="page-indicator">1 / 3</div>
+  <div class="nav-dots" id="nav-dots">
+    <div class="nav-dot active" data-index="0" title="PPT"></div>
+    <div class="nav-dot" data-index="1" title="图片轮播"></div>
+    <div class="nav-dot" data-index="2" title="数据看板"></div>
+  </div>
+
+  <!-- ===== 暂停提示 ===== -->
+  <div class="pause-overlay" id="pause-overlay">
+    已暂停自动轮播 · 按 <span class="key">→</span> <span class="key">←</span> 手动切换 · 按 <span class="key">Space</span> 继续
+  </div>
+
+<!-- ===== 加载配置 ===== -->
+<script src="config.js"></script>
+
+<script>
+// ================================================================
+// 应用逻辑 — 配置在 config.js 中修改，此文件一般不用动
+// ================================================================
+
+class TVDashboard {
+  constructor() {
+    this.currentSlide = 0;
+    this.totalSlides = document.querySelectorAll('.slide').length;
+    this.timer = null;
+    this.isPaused = false;
+    this.dataTimer = null;
+
+    this.carousel = document.getElementById('carousel');
+    this.dots = document.querySelectorAll('.nav-dot');
+    this.indicator = document.getElementById('page-indicator');
+    this.pauseOverlay = document.getElementById('pause-overlay');
+
+    this.tableHead = document.getElementById('table-head');
+    this.tableBody = document.getElementById('table-body');
+    this.tableScroll = document.getElementById('table-scroll');
+    this.updateTime = document.getElementById('update-time');
+    this.rowCount = document.getElementById('row-count');
+    this.statusDot = document.getElementById('status-dot');
+    this.statusText = document.getElementById('status-text');
+    this.clockEl = document.getElementById('clock');
+
+    this.states = {
+      loading: document.getElementById('state-loading'),
+      error: document.getElementById('state-error'),
+      empty: document.getElementById('state-empty'),
+    };
+    this.errorDetail = document.getElementById('error-detail');
+
+    this.init();
+  }
+
+  init() {
+    // 加载PPT
+    this.loadPPT();
+
+    // 初始化图片轮播
+    this.initImageCarousel();
+
+    // 绑定导航点击
+    this.dots.forEach((dot, i) => {
+      dot.addEventListener('click', () => this.goTo(i));
+    });
+
+    // 键盘控制（兼容电视遥控器）
+    document.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case 'ArrowRight': case 'ArrowDown':
+          e.preventDefault();
+          this.next();
+          break;
+        case 'ArrowLeft': case 'ArrowUp':
+          e.preventDefault();
+          this.prev();
+          break;
+        case ' ':
+          e.preventDefault();
+          this.togglePause();
+          break;
+      }
+    });
+
+    // 时钟
+    this.updateClock();
+    setInterval(() => this.updateClock(), 1000);
+
+    // 首次加载数据
+    this.fetchData();
+
+    // 启动自动轮播
+    this.startAutoPlay();
+  }
+
+  // ---- PPT加载 ----
+  loadPPT() {
+    const frame = document.getElementById('ppt-frame');
+    const fallback = document.getElementById('ppt-fallback');
+
+    if (!TV_CONFIG.pptUrl || TV_CONFIG.pptUrl.includes('你的PPT_ID')) {
+      frame.style.display = 'none';
+      fallback.classList.add('visible');
+      fallback.querySelector('div').textContent = '请在 TV_CONFIG.pptUrl 中配置PPT链接';
+      return;
+    }
+
+    frame.src = TV_CONFIG.pptUrl;
+
+    // iframe加载失败检测
+    let timeout = setTimeout(() => {
+      try {
+        // 跨域iframe无法直接检测，通过onerror捕获
+      } catch(e) {}
+      // 尝试检测加载状态
+      try {
+        const doc = frame.contentDocument || frame.contentWindow.document;
+        if (!doc || doc.body.innerHTML === '') {
+          fallback.classList.add('visible');
+        }
+      } catch(e) {
+        // 跨域限制，忽略
+      }
+    }, 15000);
+
+    frame.onload = () => {
+      clearTimeout(timeout);
+      fallback.classList.remove('visible');
+    };
+  }
+
+  // ---- 轮播控制 ----
+  goTo(index) {
+    if (index < 0 || index >= this.totalSlides) return;
+
+    // 离开图片页时暂停图片轮播
+    if (this.currentSlide === 1 && index !== 1) {
+      this.stopImageAdvance();
+    }
+    // 切到图片页时启动图片轮播
+    if (index === 1 && this.currentSlide !== 1) {
+      this.startImageAdvance();
+    }
+
+    this.currentSlide = index;
+    this.carousel.style.transform = `translateX(-${index * 100}%)`;
+
+    // 更新导航点
+    this.dots.forEach((dot, i) => {
+      dot.classList.toggle('active', i === index);
+    });
+
+    this.indicator.textContent = `${index + 1} / ${this.totalSlides}`;
+
+    // 切到数据页时刷新（如果数据过期）
+    if (index === 2) {
+      this.checkStaleData();
+    }
+  }
+
+  next() { this.goTo((this.currentSlide + 1) % this.totalSlides); }
+  prev() { this.goTo((this.currentSlide - 1 + this.totalSlides) % this.totalSlides); }
+
+  startAutoPlay() {
+    this.stopAutoPlay();
+    if (this.totalSlides < 2) return;
+    this.timer = setInterval(() => {
+      if (!this.isPaused) this.next();
+    }, TV_CONFIG.slideInterval);
+  }
+
+  stopAutoPlay() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+  }
+
+  togglePause() {
+    this.isPaused = !this.isPaused;
+    this.pauseOverlay.classList.toggle('visible', this.isPaused);
+  }
+
+  // ---- 图片轮播 ----
+  initImageCarousel() {
+    this.imageIndex = 0;
+    this.imageTimer = null;
+    this.imageProgressTimer = null;
+    this.imgEl = document.getElementById('img-main');
+    this.imgEmpty = document.getElementById('img-empty');
+    this.imgCounter = document.getElementById('img-counter');
+    this.imgProgress = document.getElementById('img-progress-bar');
+    this.imageUrls = [];
+    this.imageLoadDone = false;
+
+    var cfg = TV_CONFIG.images;
+    this.imageInterval = (cfg && cfg.interval) || 8000;
+    if (!cfg || !cfg.enabled) return;
+
+    // 方式A：从 GitHub 仓库文件夹自动读取（推荐）
+    var github = cfg.github;
+    if (github && github.owner && github.owner !== '你的GitHub用户名') {
+      this.loadFromGitHub(github);
+      return;
+    }
+
+    // 方式B：手动URL列表
+    if (cfg.urls && cfg.urls.length > 0) {
+      this.imageUrls = cfg.urls;
+      this.showEmptyState(false);
+      this.showImage(0);
+      return;
+    }
+
+    // 都没配置 → 显示提示
+    this.showEmptyState(true);
+  }
+
+  loadFromGitHub(github) {
+    var self = this;
+    var apiUrl = 'https://api.github.com/repos/'
+      + encodeURIComponent(github.owner) + '/'
+      + encodeURIComponent(github.repo) + '/contents/'
+      + encodeURIComponent(github.path);
+
+    fetch(apiUrl)
+      .then(function(r) {
+        if (!r.ok) throw new Error('API响应 ' + r.status);
+        return r.json();
+      })
+      .then(function(files) {
+        var urls = [];
+        for (var i = 0; i < files.length; i++) {
+          var f = files[i];
+          if (f.type === 'file' && f.name.match(/\.(png|jpg|jpeg|gif|webp)$/i)) {
+            urls.push(f.download_url);
+          }
+        }
+        if (urls.length === 0) throw new Error('图片文件夹中没有图片文件');
+        self.imageUrls = urls;
+        self.showEmptyState(false);
+        self.showImage(0);
+        // 如果当前正在显示图片页，立即启动自动播放
+        if (self.currentSlide === 1) self.startImageAdvance();
+      })
+      .catch(function(err) {
+        console.warn('GitHub 图片读取失败，尝试手动列表:', err.message);
+        // 回退到手动URL列表
+        var urls = (TV_CONFIG.images && TV_CONFIG.images.urls) || [];
+        if (urls.length > 0) {
+          self.imageUrls = urls;
+          self.showEmptyState(false);
+          self.showImage(0);
+        } else {
+          self.showEmptyState(true);
+        }
+      });
+  }
+
+  showEmptyState(isEmpty) {
+    if (isEmpty) {
+      this.imgEmpty.style.display = 'block';
+      this.imgEl.style.display = 'none';
+      this.imgCounter.style.display = 'none';
+    } else {
+      this.imgEmpty.style.display = 'none';
+      this.imgEl.style.display = 'block';
+      this.imgCounter.style.display = 'block';
+    }
+  }
+
+  showImage(index) {
+    if (this.imageUrls.length === 0) return;
+    this.imageIndex = index;
+    this.imgEl.src = this.imageUrls[index];
+    this.imgEl.classList.add('active');
+    this.imgCounter.textContent = (index + 1) + ' / ' + this.imageUrls.length;
+  }
+
+  nextImage() {
+    if (this.imageUrls.length === 0) return;
+    this.showImage((this.imageIndex + 1) % this.imageUrls.length);
+  }
+
+  prevImage() {
+    if (this.imageUrls.length === 0) return;
+    this.showImage((this.imageIndex - 1 + this.imageUrls.length) % this.imageUrls.length);
+  }
+
+  startImageAdvance() {
+    this.stopImageAdvance();
+    if (this.imageUrls.length < 2) return;
+
+    var self = this;
+    var startTime = Date.now();
+
+    // 进度条动画
+    this.imageProgressTimer = setInterval(function() {
+      var elapsed = Date.now() - startTime;
+      var pct = Math.min((elapsed / self.imageInterval) * 100, 100);
+      self.imgProgress.style.width = pct + '%';
+    }, 200);
+
+    // 定时切图
+    this.imageTimer = setInterval(function() {
+      self.nextImage();
+      startTime = Date.now();
+      self.imgProgress.style.width = '0%';
+    }, this.imageInterval);
+  }
+
+  stopImageAdvance() {
+    if (this.imageTimer) { clearInterval(this.imageTimer); this.imageTimer = null; }
+    if (this.imageProgressTimer) { clearInterval(this.imageProgressTimer); this.imageProgressTimer = null; }
+    this.imgProgress.style.width = '0%';
+  }
+
+  // ---- 数据获取 ----
+  async fetchData() {
+    this.showState('loading');
+    this.setStatus('loading', '正在加载...');
+
+    try {
+      let rows;
+      if (TV_CONFIG.customDataParser) {
+        rows = await TV_CONFIG.customDataParser();
+      } else {
+        rows = await this.fetchFromTencentDocs();
+      }
+
+      if (!rows || rows.length === 0) {
+        this.showState('empty');
+        this.setStatus('error', '暂无数据');
+        return;
+      }
+
+      this.renderTable(rows);
+      this.showState('table');
+      this.setStatus('ok', '数据正常');
+      this.updateTime.textContent = new Date().toLocaleString('zh-CN');
+
+    } catch (err) {
+      console.error('数据获取失败:', err);
+      this.showState('error');
+      this.errorDetail.textContent = err.message || '请检查网络和API配置';
+      this.setStatus('error', '加载失败');
+    }
+  }
+
+  async fetchFromTencentDocs() {
+    const { spreadsheetId, range, token } = TV_CONFIG.api;
+    const baseUrl = TV_CONFIG.api.baseUrl;
+
+    if (!spreadsheetId || spreadsheetId === '你的表格ID') {
+      // 开发模式：返回模拟数据
+      return this.getMockData();
+    }
+
+    if (!token || token.startsWith('你的API_TOKEN')) {
+      console.warn('API Token未配置，使用模拟数据');
+      return this.getMockData();
+    }
+
+    const url = `${baseUrl}/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}`;
+    // 如果腾讯文档API用不同的编码方式，也可以尝试:
+    // const url = `${baseUrl}/spreadsheets/${spreadsheetId}/values?range=${range}`;
+
+    const resp = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      throw new Error(`API请求失败 (${resp.status}): ${text || resp.statusText}`);
+    }
+
+    const data = await resp.json();
+    return this.parseTencentDocsData(data);
+  }
+
+  /**
+   * 解析腾讯文档API返回数据
+   * 预期格式: { values: [ ["col1", "col2", ...], ["val1", "val2", ...], ... ] }
+   * 第一行作为表头（自动识别），后续行作为数据
+   */
+  parseTencentDocsData(data) {
+    const rawValues = data.values || data.data || [];
+    if (!rawValues.length) return [];
+
+    // 如果第一行和配置的列名匹配，则跳过表头行
+    const firstRow = rawValues[0];
+    const headerLabels = TV_CONFIG.columns.map(c => c.label);
+    const isHeaderRow = firstRow.some(v => headerLabels.includes(v));
+    const dataRows = isHeaderRow ? rawValues.slice(1) : rawValues;
+
+    return dataRows.map((row, ri) => {
+      const obj = {};
+      TV_CONFIG.columns.forEach((col, ci) => {
+        obj[col.key] = row[ci] !== undefined ? String(row[ci]) : '';
+      });
+      return obj;
+    });
+  }
+
+  // ---- 模拟数据（开发测试用） ----
+  getMockData() {
+    const statuses = ['完成', '进行中', '待开始', '延迟'];
+    const items = [
+      '第一季度销售报告', '市场推广计划', '产品研发进度',
+      '客户满意度调查', '预算执行情况', '人员招聘进展',
+      'IT系统升级', '供应链优化', '质量审核报告',
+      '年度培训计划', '合规检查清单', '设备维护记录',
+    ];
+    return items.map((name, i) => ({
+      col0: String(i + 1),
+      col1: name,
+      col2: String(Math.round(Math.random() * 10000) / 100),
+      col3: statuses[Math.floor(Math.random() * statuses.length)],
+      col4: ['正常推进中', '需要关注', '下周截止', '已延期'][Math.floor(Math.random() * 4)],
+    }));
+  }
+
+  // ---- 表格渲染 ----
+  renderTable(rows) {
+    // 渲染表头
+    this.tableHead.innerHTML = '';
+    const headRow = document.createElement('tr');
+    TV_CONFIG.columns.forEach(col => {
+      const th = document.createElement('th');
+      th.textContent = col.label;
+      if (col.width) th.style.width = col.width;
+      if (col.align) th.style.textAlign = col.align;
+      headRow.appendChild(th);
+    });
+    this.tableHead.appendChild(headRow);
+
+    // 渲染数据行
+    this.tableBody.innerHTML = '';
+    rows.forEach(row => {
+      const tr = document.createElement('tr');
+      TV_CONFIG.columns.forEach(col => {
+        const td = document.createElement('td');
+        let val = row[col.key] || '';
+
+        // 状态标签渲染
+        if (col.badge && col.badge[val] !== undefined) {
+          const badge = document.createElement('span');
+          badge.className = `badge badge-${col.badge[val]}`;
+          badge.textContent = val;
+          td.appendChild(badge);
+        } else {
+          td.textContent = val;
+        }
+
+        if (col.align) td.style.textAlign = col.align;
+        tr.appendChild(td);
+      });
+      this.tableBody.appendChild(tr);
+    });
+
+    this.rowCount.textContent = rows.length;
+
+    // 滚动回顶部
+    this.tableScroll.scrollTop = 0;
+  }
+
+  // ---- 状态管理 ----
+  showState(state) {
+    Object.keys(this.states).forEach(key => {
+      this.states[key].classList.toggle('visible', key === state);
+    });
+    this.tableScroll.style.display = state === 'table' ? 'block' : 'none';
+  }
+
+  setStatus(type, text) {
+    this.statusDot.className = 'status-dot';
+    if (type === 'ok') this.statusDot.classList.add('ok');
+    else if (type === 'error') this.statusDot.classList.add('error');
+    else if (type === 'loading') this.statusDot.classList.add('loading');
+    this.statusText.textContent = text;
+  }
+
+  checkStaleData() {
+    const elapsed = Date.now() - (this._lastFetchTime || 0);
+    if (elapsed > TV_CONFIG.dataRefreshInterval) {
+      this.fetchData();
+    }
+  }
+
+  // ---- 定时刷新 ----
+  startDataRefresh() {
+    this.stopDataRefresh();
+    this.dataTimer = setInterval(() => {
+      this.fetchData();
+    }, TV_CONFIG.dataRefreshInterval);
+  }
+
+  stopDataRefresh() {
+    if (this.dataTimer) { clearInterval(this.dataTimer); this.dataTimer = null; }
+  }
+
+  // ---- 时钟 ----
+  updateClock() {
+    if (!this.clockEl) return;
+    const now = new Date();
+    this.clockEl.textContent = now.toLocaleString('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    });
+  }
+}
+
+// ================================================================
+// 启动
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  window.app = new TVDashboard();
+  window.app.startDataRefresh();
+});
+</script>
+</body>
+</html>
